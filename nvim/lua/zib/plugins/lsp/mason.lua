@@ -27,7 +27,7 @@ return {
     mason_lspconfig.setup({
       -- list of servers for mason to install
       ensure_installed = {
-        "ruff_lsp",
+        "ruff",
         "ts_ls",
         "html",
         "cssls",
@@ -47,7 +47,6 @@ return {
         "stylua", -- lua formatter
         "isort", -- python formatter
         "black", -- python formatter
-        "pylint",
         "eslint_d",
       },
     })

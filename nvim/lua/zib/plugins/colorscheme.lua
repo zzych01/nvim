@@ -1,45 +1,36 @@
+-- Create a new file: lua/plugins/colorscheme.lua
 return {
-  "folke/tokyonight.nvim",
-  priority = 1000,
+  "sainnhe/sonokai",
+  priority = 1000, -- Make sure to load this before all the other start plugins
   config = function()
-    local transparent = false -- set to true if you would like to enable transparency
+    -- Configure Sonokai before loading
+    vim.g.sonokai_style = "shusia" -- Options: 'default', 'atlantis', 'andromeda', 'shusia', 'maia', 'espresso'
+    vim.g.sonokai_enable_italic = 1
+    vim.g.sonokai_disable_italic_comment = 0
+    vim.g.sonokai_diagnostic_line_highlight = 1
+    vim.g.sonokai_diagnostic_text_highlight = 1
+    vim.g.sonokai_diagnostic_virtual_text = "colored"
+    vim.g.sonokai_current_word = "grey background"
 
-    local bg = "#011628"
-    local bg_dark = "#011423"
-    local bg_highlight = "#143652"
-    local bg_search = "#0A64AC"
-    local bg_visual = "#275378"
-    local fg = "#CBE0F0"
-    local fg_dark = "#B4D0E9"
-    local fg_gutter = "#627E97"
-    local border = "#547998"
+    -- Better colors for nvim-tree and file explorers
+    vim.g.sonokai_better_performance = 1
 
-    require("tokyonight").setup({
-      style = "night",
-      transparent = transparent,
-      styles = {
-        sidebars = transparent and "transparent" or "dark",
-        floats = transparent and "transparent" or "dark",
-      },
-      on_colors = function(colors)
-        colors.bg = bg
-        colors.bg_dark = transparent and colors.none or bg_dark
-        colors.bg_float = transparent and colors.none or bg_dark
-        colors.bg_highlight = bg_highlight
-        colors.bg_popup = bg_dark
-        colors.bg_search = bg_search
-        colors.bg_sidebar = transparent and colors.none or bg_dark
-        colors.bg_statusline = transparent and colors.none or bg_dark
-        colors.bg_visual = bg_visual
-        colors.border = border
-        colors.fg = fg
-        colors.fg_dark = fg_dark
-        colors.fg_float = fg
-        colors.fg_gutter = fg_gutter
-        colors.fg_sidebar = fg_dark
+    -- Load the colorscheme
+    vim.cmd.colorscheme("sonokai")
+
+    -- Optional: Additional customizations for nvim-tree integration
+    vim.api.nvim_create_autocmd("ColorScheme", {
+      pattern = "*",
+      callback = function()
+        -- Customize nvim-tree colors if needed
+        vim.api.nvim_set_hl(0, "NvimTreeFolderIcon", { fg = "#a7c080" })
+        vim.api.nvim_set_hl(0, "NvimTreeOpenedFolderName", { fg = "#a7c080", bold = true })
+        vim.api.nvim_set_hl(0, "NvimTreeFolderName", { fg = "#d3c6aa" })
+        vim.api.nvim_set_hl(0, "NvimTreeIndentMarker", { fg = "#544a65" })
+        vim.api.nvim_set_hl(0, "NvimTreeGitDirty", { fg = "#dbbc7f" })
+        vim.api.nvim_set_hl(0, "NvimTreeGitNew", { fg = "#a7c080" })
+        vim.api.nvim_set_hl(0, "NvimTreeGitDeleted", { fg = "#fc5d7c" })
       end,
     })
-
-    vim.cmd("colorscheme tokyonight")
   end,
 }
