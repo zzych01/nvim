@@ -183,4 +183,114 @@ function M.get_available_boards()
   }
 end
 
+-- Get all board variants using west boards command
+local function get_all_board_variants(version_path)
+  local boards = {}
+  
+  -- Try to run west boards command from current workspace (where user is building)
+  -- This will give us all board variants with full qualified names
+  local current_dir = vim.fn.getcwd()
+  local handle = io.popen("cd " .. vim.fn.shellescape(current_dir) .. " && west boards 2>/dev/null")
+  if handle then
+    for line in handle:lines() do
+      line = vim.trim(line)
+      if line ~= "" and not line:match("^%s*$") and not line:match("^%s*#") then
+        -- Filter out comment lines
+        table.insert(boards, line)
+      end
+    end
+    handle:close()
+  end
+  
+  -- If west boards failed or returned no results, fall back to scanning
+  if #boards == 0 then
+    local scanned_boards = get_all_boards(version_path)
+    for _, board in ipairs(scanned_boards) do
+      local board_info = get_board_info(board.path)
+      if board_info.identifier then
+        table.insert(boards, board_info.identifier)
+      else
+        -- Use display_name as fallback (includes path like zephyr/boards/arm/nrf54l15dk)
+        -- Convert to board identifier format
+        local display = board.display_name
+        -- Try to extract board identifier from path
+        -- e.g., "zephyr/boards/arm/nrf54l15dk" -> "nrf54l15dk"
+        local board_name = display:match("([^/]+)$")
+        if board_name then
+          table.insert(boards, board_name)
+        end
+      end
+    end
+  end
+  
+  table.sort(boards)
+  return boards
+end
+
+-- Export functions for use in other modules
+function M.get_all_boards(version_path)
+  return get_all_boards(version_path)
+end
+
+function M.get_board_info(board_path)
+  return get_board_info(board_path)
+end
+
+function M.get_all_board_variants(version_path)
+  return get_all_board_variants(version_path)
+end
+
+-- Get variants for a specific board by scanning _defconfig files
+function M.get_board_variants(board_name, version_path)
+  local variants = {}
+  
+  -- Find the board directory by scanning
+  local scanned_boards = get_all_boards(version_path)
+  local board_path = nil
+  
+  for _, board in ipairs(scanned_boards) do
+    if board.name == board_name then
+      board_path = board.path
+      break
+    end
+  end
+  
+  if not board_path then
+    return variants
+  end
+  
+  -- Scan for _defconfig files to find all board variants
+  local handle = vim.loop.fs_scandir(board_path)
+  if handle then
+    local name, type = vim.loop.fs_scandir_next(handle)
+    while name do
+      if type == "file" and name:match("^" .. board_name .. "_.*_defconfig$") then
+        local variant_part = name:match("^" .. board_name .. "_(.+)_defconfig$")
+        if variant_part then
+          local parts = {}
+          for part in variant_part:gmatch("[^_]+") do
+            table.insert(parts, part)
+          end
+          local full_variant = board_name .. "/" .. table.concat(parts, "/")
+          
+          local exists = false
+          for _, v in ipairs(variants) do
+            if v == full_variant then
+              exists = true
+              break
+            end
+          end
+          if not exists then
+            table.insert(variants, full_variant)
+          end
+        end
+      end
+      name, type = vim.loop.fs_scandir_next(handle)
+    end
+  end
+  
+  table.sort(variants)
+  return variants
+end
+
 return M

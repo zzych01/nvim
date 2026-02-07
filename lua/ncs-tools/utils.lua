@@ -67,6 +67,52 @@ function M.update_nvim_tree(path)
   end, 100)
 end
 
+function M.configure_project_paths()
+  local versions = M.get_ncs_versions()
+
+  if #versions == 0 then
+    print("No NCS versions found")
+    return
+  end
+
+  local version_names = {}
+  for _, v in ipairs(versions) do
+    table.insert(version_names, v.version)
+  end
+
+  vim.ui.select(version_names, {
+    prompt = "Select NCS Version for include paths:",
+  }, function(choice, idx)
+    if not choice or not idx then
+      return
+    end
+
+    local selected = versions[idx]
+    local base_path = selected.path
+
+    -- Clear existing NCS paths
+    vim.opt.path:remove("/opt/nordic/ncs/**/include/**")
+
+    -- Add new paths
+    local paths = {
+      base_path .. "/zephyr/include/**",
+      base_path .. "/nrf/include/**",
+      base_path .. "/zephyr/boards/**",
+      base_path .. "/nrf/boards/**",
+      base_path .. "/zephyr/dts/**",
+      base_path .. "/nrf/dts/**",
+      base_path .. "/modules/**/include/**",
+    }
+
+    for _, path in ipairs(paths) do
+      vim.opt.path:append(path)
+    end
+
+    print("Configured paths for NCS " .. selected.version)
+    print("Now 'gf' should work on system includes")
+  end)
+end
+
 function M.show_project_info()
   local cwd = vim.fn.getcwd()
   local ncs_match = cwd:match("/opt/nordic/ncs/([^/]+)")

@@ -15,6 +15,7 @@ function M.setup(opts)
   keymap.set("n", "<leader>ns", samples.browser, { desc = "NCS Sample Browser" })
   keymap.set("n", "<leader>nb", build.configuration, { desc = "NCS Build Configuration" })
   keymap.set("n", "<leader>nB", boards.browser, { desc = "NCS Board Browser" })
+  keymap.set("n", "<leader>np", utils.configure_project_paths, { desc = "NCS Configure Project Paths" })
 
   -- Keep existing build shortcuts
   keymap.set("n", "<leader>nf", "<cmd>TermExec cmd='west flash'<CR>", { desc = "NCS Flash" })
