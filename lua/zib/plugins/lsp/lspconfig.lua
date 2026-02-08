@@ -93,6 +93,22 @@ return {
     end
 
     mason_lspconfig.setup({
+      ensure_installed = {
+        "ruff",
+        "ts_ls",
+        "html",
+        "cssls",
+        "tailwindcss",
+        "svelte",
+        "lua_ls",
+        "graphql",
+        "emmet_ls",
+        "prismals",
+        "pyright",
+        "clangd",
+        "cmake",
+      },
+      automatic_installation = false,
       handlers = { -- mason_lspconfig.setup_handlers doesn't exist but mason_lspconfig.setup({handlers = {}}) exists
         -- default handler for installed servers
         function(server_name)

@@ -1,0 +1,10 @@
+
+
+Lua :command callback: ...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: attempt to call field 'get_buf_lang' (a nil value)
+stack traceback:
+	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: in function 'v'
+	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:595: in function 'v'
+	.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:543: in function <.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:502>
+	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:188: in function 'run_command'
+	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:259: in function 'load_command'
+	...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:108: in function <...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:107>

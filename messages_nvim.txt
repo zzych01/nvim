@@ -1,0 +1,24 @@
+
+
+Error executing Lua callback: ...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: attempt to call field 'get_buf_lang' (a nil value)
+stack traceback:
+	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: in function 'v'
+	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:595: in function 'v'
+	.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:543: in function <.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:502>
+	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:188: in function 'run_command'
+	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:259: in function 'load_command'
+	...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:108: in function <...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:107>
+E475: Invalid argument: messages_nvim.txt
+nvim-lspconfig support for Nvim 0.10 or older is deprecated, use Nvim 0.11+ instead.
+Feature will be removed in nvim-lspconfig v3.0.0
+Failed to run `config` for nvim-lspconfig
+
+...g.nvim/lua/mason-lspconfig/features/automatic_enable.lua:47: attempt to call field 'enable' (a nil value)
+
+# stacktrace:
+  - /mason-lspconfig.nvim/lua/mason-lspconfig/features/automatic_enable.lua:47 _in_ **fn**
+  - /mason.nvim/lua/mason-core/functional/list.lua:116 _in_ **each**
+  - /mason-lspconfig.nvim/lua/mason-lspconfig/features/automatic_enable.lua:56 _in_ **init**
+  - /mason-lspconfig.nvim/lua/mason-lspconfig/init.lua:43 _in_ **setup**
+  - lua/zib/plugins/lsp/lspconfig.lua:95 _in_ **config**
+11 lines yanked
