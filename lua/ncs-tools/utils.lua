@@ -1,30 +1,37 @@
 -- File: nvim/lua/zib/ncs-tools/utils.lua
 local M = {}
 
+local ncs_search_paths = {
+  vim.env.HOME .. "/ncs",
+  "/opt/nordic/ncs",
+}
+
 function M.get_ncs_versions()
-  local ncs_base = "/opt/nordic/ncs"
   local versions = {}
 
-  if vim.fn.isdirectory(ncs_base) == 0 then
-    print("NCS directory not found at: " .. ncs_base)
-    return {}
-  end
-
-  local handle = vim.loop.fs_scandir(ncs_base)
-  if handle then
-    local name, type = vim.loop.fs_scandir_next(handle)
-    while name do
-      local full_path = ncs_base .. "/" .. name
-      if type == "directory" and vim.fn.isdirectory(full_path) == 1 then
-        if name:match("^v%d") or name:match("%d%.%d") then
-          table.insert(versions, {
-            version = name,
-            path = full_path,
-          })
+  for _, ncs_base in ipairs(ncs_search_paths) do
+    if vim.fn.isdirectory(ncs_base) == 1 then
+      local handle = vim.loop.fs_scandir(ncs_base)
+      if handle then
+        local name, type = vim.loop.fs_scandir_next(handle)
+        while name do
+          local full_path = ncs_base .. "/" .. name
+          if type == "directory" and vim.fn.isdirectory(full_path) == 1 then
+            if name:match("^v%d") or name:match("%d%.%d") then
+              table.insert(versions, {
+                version = name,
+                path = full_path,
+              })
+            end
+          end
+          name, type = vim.loop.fs_scandir_next(handle)
         end
       end
-      name, type = vim.loop.fs_scandir_next(handle)
     end
+  end
+
+  if #versions == 0 then
+    print("NCS directory not found in: " .. table.concat(ncs_search_paths, ", "))
   end
 
   table.sort(versions, function(a, b)
@@ -91,7 +98,9 @@ function M.configure_project_paths()
     local base_path = selected.path
 
     -- Clear existing NCS paths
-    vim.opt.path:remove("/opt/nordic/ncs/**/include/**")
+    for _, ncs_base in ipairs(ncs_search_paths) do
+      vim.opt.path:remove(ncs_base .. "/**/include/**")
+    end
 
     -- Add new paths
     local paths = {
@@ -115,7 +124,11 @@ end
 
 function M.show_project_info()
   local cwd = vim.fn.getcwd()
-  local ncs_match = cwd:match("/opt/nordic/ncs/([^/]+)")
+  local ncs_match = nil
+  for _, ncs_base in ipairs(ncs_search_paths) do
+    ncs_match = cwd:match(vim.pesc(ncs_base) .. "/([^/]+)")
+    if ncs_match then break end
+  end
 
   if ncs_match then
     print("Current NCS version: " .. ncs_match)

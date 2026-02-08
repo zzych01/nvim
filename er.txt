@@ -1,10 +1,17 @@
 
 
-Lua :command callback: ...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: attempt to call field 'get_buf_lang' (a nil value)
+Error in BufReadPost Autocommands for "*":
+Lua callback: /usr/share/nvim/runtime/filetype.lua:28: BufReadPost Autocommands for "*"..FileType Autocommands for "*"..function <SNR>1_LoadFTPlugin[20]..script /usr/share/nvim/runtime/ftplugin/lua.lua: Vim(runtime):E5113: Lua chunk: /usr/share/nvim/runtime/lua/vim/treesitter.lua:460: Parser could not be created for buffer 1 and language "lua"
 stack traceback:
-	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:381: in function 'v'
-	...im/lazy/telescope.nvim/lua/telescope/builtin/__files.lua:595: in function 'v'
-	.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:543: in function <.../nvim/lazy/telescope.nvim/lua/telescope/builtin/init.lua:502>
-	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:188: in function 'run_command'
-	...share/nvim/lazy/telescope.nvim/lua/telescope/command.lua:259: in function 'load_command'
-	...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:108: in function <...ocal/share/nvim/lazy/telescope.nvim/plugin/telescope.lua:107>
+	[C]: in function 'assert'
+	/usr/share/nvim/runtime/lua/vim/treesitter.lua:460: in function 'start'
+	/usr/share/nvim/runtime/ftplugin/lua.lua:2: in main chunk
+	[C]: in function 'nvim_cmd'
+	/usr/share/nvim/runtime/filetype.lua:28: in function </usr/share/nvim/runtime/filetype.lua:27>
+	[C]: in function 'pcall'
+	vim/shared.lua: in function <vim/shared.lua:0>
+	[C]: in function '_with'
+	/usr/share/nvim/runtime/filetype.lua:27: in function </usr/share/nvim/runtime/filetype.lua:10>
+stack traceback:
+	[C]: in function '_with'
+	/usr/share/nvim/runtime/filetype.lua:27: in function </usr/share/nvim/runtime/filetype.lua:10>
