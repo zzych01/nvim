@@ -17,11 +17,18 @@ function M.setup(opts)
   keymap.set("n", "<leader>nB", boards.browser, { desc = "NCS Board Browser" })
   keymap.set("n", "<leader>np", utils.configure_project_paths, { desc = "NCS Configure Project Paths" })
 
-  -- Keep existing build shortcuts
-  keymap.set("n", "<leader>nf", "<cmd>TermExec cmd='west flash'<CR>", { desc = "NCS Flash" })
-  keymap.set("n", "<leader>nc", "<cmd>TermExec cmd='west build -t clean'<CR>", { desc = "NCS Clean" })
-  keymap.set("n", "<leader>nm", "<cmd>TermExec cmd='west build -t menuconfig'<CR>", { desc = "NCS Menuconfig" })
+  -- Keep existing build shortcuts (with venv activation if .venv exists in cwd)
+  keymap.set("n", "<leader>nf", function()
+    vim.cmd("TermExec cmd='" .. utils.get_venv_prefix() .. "west flash'")
+  end, { desc = "NCS Flash" })
+  keymap.set("n", "<leader>nc", function()
+    vim.cmd("TermExec cmd='" .. utils.get_venv_prefix() .. "west build -t clean'")
+  end, { desc = "NCS Clean" })
+  keymap.set("n", "<leader>nm", function()
+    vim.cmd("TermExec cmd='" .. utils.get_venv_prefix() .. "west build -t menuconfig'")
+  end, { desc = "NCS Menuconfig" })
   keymap.set("n", "<leader>ni", utils.show_project_info, { desc = "Show NCS project info" })
+  keymap.set("n", "<leader>nl", utils.link_compile_commands, { desc = "NCS Link compile_commands.json" })
 end
 
 return M
