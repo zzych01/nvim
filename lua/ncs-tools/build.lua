@@ -57,19 +57,15 @@ local function execute_build(config, utils)
     source_flag = " -s " .. config.source_dir_relative
   end
 
-  local build_dir = vim.fn.getcwd() .. "/build"
-  local flash_cmd = "(cd " .. config.sdk_path .. " && west flash --build-dir " .. build_dir .. ")"
-  local debug_cmd = "(cd " .. config.sdk_path .. " && west debug --build-dir " .. build_dir .. ")"
-
   local build_cmd = ""
   if config.build_action == "Build" then
     build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag
   elseif config.build_action == "Build (pristine)" then
     build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " --pristine"
   elseif config.build_action == "Build and Flash" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && " .. flash_cmd
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && west flash"
   elseif config.build_action == "Build and Debug" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && " .. debug_cmd
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && west debug"
   end
 
   utils.save_recent_build(config)
@@ -257,32 +253,7 @@ function M.configuration()
     if choice == "New configuration..." then
       run_wizard(utils, boards)
     else
-      local selected_config = recent[idx]
-      local action_options = {
-        "· Run unmodified  [" .. selected_config.build_action .. "]",
-        "p · Pristine",
-        "b · Build",
-        "f · Build and Flash",
-        "d · Build and Debug",
-      }
-      vim.ui.select(action_options, {
-        prompt = "Action:",
-      }, function(action_choice)
-        if not action_choice then
-          return
-        end
-        local config = vim.deepcopy(selected_config)
-        if action_choice:match("^p") then
-          config.build_action = "Build (pristine)"
-        elseif action_choice:match("^b") then
-          config.build_action = "Build"
-        elseif action_choice:match("^f") then
-          config.build_action = "Build and Flash"
-        elseif action_choice:match("^d") then
-          config.build_action = "Build and Debug"
-        end
-        execute_build(config, utils)
-      end)
+      execute_build(recent[idx], utils)
     end
   end)
 end

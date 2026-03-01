@@ -8,11 +8,7 @@ return {
   },
   config = function()
     local cmp_nvim_lsp = require("cmp_nvim_lsp")
-    local capabilities = vim.tbl_deep_extend(
-      "force",
-      vim.lsp.protocol.make_client_capabilities(),
-      cmp_nvim_lsp.default_capabilities()
-    )
+    local capabilities = cmp_nvim_lsp.default_capabilities()
     local keymap = vim.keymap
 
     vim.api.nvim_create_autocmd("LspAttach", {
@@ -98,7 +94,6 @@ return {
         "cmake",
       },
       automatic_installation = true,
-      automatic_enable = false,
     })
 
     -- Use vim.lsp.config() for custom server settings (Neovim 0.11+ API)
@@ -128,14 +123,14 @@ return {
 
     vim.lsp.config("clangd", {
       cmd = {
-        vim.fn.expand("~/.local/share/nvim/mason/bin/clangd"),
+        "clangd",
         "--background-index",
         "--clang-tidy",
         "--header-insertion=iwyu",
         "--completion-style=detailed",
         "--function-arg-placeholders",
         "--fallback-style=llvm",
-        "--query-driver=/home/zib/zephyr-sdk-*/*/bin/*,/usr/bin/gcc,/usr/bin/g++",
+        "--compile-commands-dir=build",
       },
       init_options = {
         usePlaceholders = true,
@@ -144,6 +139,10 @@ return {
       },
       root_markers = {
         "west.yml",
+        "Kconfig",
+        "prj.conf",
+        "CMakeLists.txt",
+        "compile_commands.json",
         ".git",
       },
     })

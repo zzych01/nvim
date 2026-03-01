@@ -119,14 +119,6 @@ function M.configure_project_paths()
 
     print("Configured paths for NCS " .. selected.version)
     print("Now 'gf' should work on system includes")
-
-    local venv_bin = base_path .. "/.venv/bin"
-    if vim.fn.isdirectory(venv_bin) == 1 then
-      vim.env.PATH = venv_bin .. ":" .. vim.env.PATH
-      print("NCS venv active: " .. venv_bin)
-    else
-      print("No .venv found for " .. selected.version)
-    end
   end)
 end
 
@@ -205,11 +197,9 @@ function M.link_compile_commands()
 
   local function do_link(entry)
     local target = build_dir .. "/compile_commands.json"
-    local root_target = vim.fn.getcwd() .. "/compile_commands.json"
     vim.fn.system("ln -sf " .. vim.fn.shellescape(entry.path) .. " " .. vim.fn.shellescape(target))
-    vim.fn.system("ln -sf " .. vim.fn.shellescape(entry.path) .. " " .. vim.fn.shellescape(root_target))
     if vim.v.shell_error == 0 then
-      print("Linked: compile_commands.json -> build/" .. entry.label .. "/compile_commands.json")
+      print("Linked: build/compile_commands.json -> build/" .. entry.label .. "/compile_commands.json")
       vim.cmd("LspRestart")
     else
       print("Failed to create symlink")
