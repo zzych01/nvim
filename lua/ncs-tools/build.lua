@@ -11,15 +11,30 @@ local function get_optimization_levels()
   }
 end
 
+local function get_build_actions()
+  return { "Build", "Build (pristine)", "Build and Flash", "Build and Debug" }
+end
+
+local function reorder_first(list, value)
+  if not value then return list end
+  local result, found_idx = {}, nil
+  for i, item in ipairs(list) do
+    if item == value then found_idx = i end
+  end
+  if not found_idx then return list end
+  table.insert(result, list[found_idx])
+  for i, item in ipairs(list) do
+    if i ~= found_idx then table.insert(result, item) end
+  end
+  return result
+end
+
 local function scan_build_directories(base_path, max_depth)
   max_depth = max_depth or 3
   local directories = {}
 
   local function scan_recursive(path, relative_path, depth)
-    if depth > max_depth or vim.fn.isdirectory(path) == 0 then
-      return
-    end
-
+    if depth > max_depth or vim.fn.isdirectory(path) == 0 then return end
     if vim.fn.filereadable(path .. "/CMakeLists.txt") == 1 then
       table.insert(directories, {
         path = path,
@@ -27,7 +42,6 @@ local function scan_build_directories(base_path, max_depth)
         relative = relative_path,
       })
     end
-
     local handle = vim.loop.fs_scandir(path)
     if handle then
       local name, type = vim.loop.fs_scandir_next(handle)
@@ -43,29 +57,33 @@ local function scan_build_directories(base_path, max_depth)
   end
 
   scan_recursive(base_path, ".", 0)
-  table.sort(directories, function(a, b)
-    return a.display < b.display
-  end)
+  table.sort(directories, function(a, b) return a.display < b.display end)
   return directories
 end
 
 local function execute_build(config, utils)
   local venv_prefix = utils.get_venv_prefix()
   local zephyr_base_flag = "ZEPHYR_BASE=" .. config.sdk_path .. "/zephyr "
-  local source_flag = ""
-  if config.source_dir_relative ~= "." then
+  local source_flag, build_dir_flag = "", ""
+  local abs_build_dir = vim.fn.getcwd() .. "/build"
+  if config.source_dir_relative and config.source_dir_relative ~= "." then
     source_flag = " -s " .. config.source_dir_relative
+    abs_build_dir = vim.fn.getcwd() .. "/" .. config.source_dir_relative .. "/build"
+    build_dir_flag = " --build-dir " .. abs_build_dir
   end
+
+  local flash_cmd = "(cd " .. config.sdk_path .. " && west flash --build-dir " .. abs_build_dir .. ")"
+  local debug_cmd = "(cd " .. config.sdk_path .. " && west debug --build-dir " .. abs_build_dir .. ")"
 
   local build_cmd = ""
   if config.build_action == "Build" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. build_dir_flag
   elseif config.build_action == "Build (pristine)" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " --pristine"
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. build_dir_flag .. " --pristine"
   elseif config.build_action == "Build and Flash" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && west flash"
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. build_dir_flag .. " && " .. flash_cmd
   elseif config.build_action == "Build and Debug" then
-    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. " && west debug"
+    build_cmd = venv_prefix .. zephyr_base_flag .. "west build -b " .. config.board .. source_flag .. build_dir_flag .. " && " .. debug_cmd
   end
 
   utils.save_recent_build(config)
@@ -73,156 +91,222 @@ local function execute_build(config, utils)
   vim.cmd("TermExec cmd='" .. build_cmd .. "'")
 end
 
-local function run_wizard(utils, boards)
-  local config = {}
+-- Edit a single field, then reopen the editor
+local function show_config_editor(utils, boards, config, on_run)
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
 
-  local versions = utils.get_ncs_versions()
-  if #versions == 0 then
-    print("No NCS versions found")
-    return
-  end
+  local fields = {
+    { key = "sdk_version",          label = "SDK",    value = config.sdk_version or "?" },
+    { key = "board",                label = "Board",  value = config.board or "?" },
+    { key = "source_dir_relative",  label = "Source", value = config.source_dir_relative or "." },
+    { key = "build_action",         label = "Action", value = config.build_action or "?" },
+    { key = "optimization",         label = "Optim",  value = config.optimization or "?" },
+  }
 
-  local version_names = {}
-  for _, v in ipairs(versions) do
-    table.insert(version_names, v.version)
-  end
-
-  vim.ui.select(version_names, {
-    prompt = "SDK Version:",
-  }, function(sdk_choice, idx)
-    if not sdk_choice or not idx then
-      return
-    end
-    config.sdk_version = sdk_choice
-
-    local selected_version = versions[idx]
-    config.sdk_path = selected_version.path
-    print("Scanning boards in " .. selected_version.version .. "...")
-
-    local board_list = boards.get_all_board_variants(selected_version.path)
-
-    if #board_list == 0 then
-      print("No boards found in " .. selected_version.version)
-      return
-    end
-
-    table.insert(board_list, "custom")
-
-    local function continue_with_optimization()
-      local opt_levels = get_optimization_levels()
-      vim.ui.select(opt_levels, {
-        prompt = "Optimization Level:",
-      }, function(opt_choice)
-        if not opt_choice then
-          return
+  local function edit_field(field_key, callback)
+    if field_key == "sdk_version" then
+      local versions = utils.get_ncs_versions()
+      local names = {}
+      for _, v in ipairs(versions) do table.insert(names, v.version) end
+      names = reorder_first(names, config.sdk_version)
+      vim.ui.select(names, { prompt = "SDK Version:" }, function(choice)
+        if not choice then callback(config); return end
+        config.sdk_version = choice
+        for _, v in ipairs(versions) do
+          if v.version == choice then config.sdk_path = v.path; break end
         end
-        config.optimization = opt_choice
-
-        local build_types = {
-          "Build",
-          "Build (pristine)",
-          "Build and Flash",
-          "Build and Debug",
-        }
-
-        vim.ui.select(build_types, {
-          prompt = "Build Action:",
-        }, function(build_choice)
-          if not build_choice then
-            return
-          end
-          config.build_action = build_choice
-          execute_build(config, utils)
-        end)
+        callback(config)
       end)
-    end
 
-    local function continue_config()
-      local current_dir = vim.fn.getcwd()
-      print("Scanning for build directories...")
-      local build_dirs = scan_build_directories(current_dir, 3)
-
-      if #build_dirs == 0 then
-        print("No directories with CMakeLists.txt found. Using current directory.")
-        config.source_dir = current_dir
-        config.source_dir_relative = "."
-        continue_with_optimization()
-        return
-      end
-
-      local dir_options = {}
-      for _, dir in ipairs(build_dirs) do
-        table.insert(dir_options, dir.display)
-      end
-      table.insert(dir_options, "Custom path...")
-
-      vim.ui.select(dir_options, {
-        prompt = "Source Directory (" .. #build_dirs .. " found):",
-      }, function(dir_choice, dir_idx)
-        if not dir_choice then
-          return
+    elseif field_key == "board" then
+      local versions = utils.get_ncs_versions()
+      local sdk_path = config.sdk_path
+      if not sdk_path then
+        for _, v in ipairs(versions) do
+          if v.version == config.sdk_version then sdk_path = v.path; break end
         end
-
-        if dir_choice == "Custom path..." then
-          vim.ui.input({
-            prompt = "Custom source directory path: ",
-            default = current_dir,
-            completion = "dir",
-          }, function(custom_path)
-            if custom_path and custom_path ~= "" then
-              config.source_dir = vim.fn.fnamemodify(custom_path, ":p")
-              config.source_dir_relative = custom_path
-              continue_with_optimization()
-            end
+      end
+      local board_list = boards.get_all_board_variants(sdk_path or versions[1].path)
+      board_list = reorder_first(board_list, config.board)
+      table.insert(board_list, "custom")
+      vim.ui.select(board_list, { prompt = "Board:" }, function(choice)
+        if not choice then callback(config); return end
+        if choice == "custom" then
+          vim.ui.input({ prompt = "Custom board: ", default = config.board or "" }, function(val)
+            if val and val ~= "" then config.board = val end
+            callback(config)
           end)
         else
-          local selected_dir = build_dirs[dir_idx]
-          config.source_dir = selected_dir.path
-          config.source_dir_relative = selected_dir.relative
-          continue_with_optimization()
+          config.board = choice
+          callback(config)
+        end
+      end)
+
+    elseif field_key == "source_dir_relative" then
+      local build_dirs = scan_build_directories(vim.fn.getcwd(), 3)
+      local options = {}
+      for _, d in ipairs(build_dirs) do table.insert(options, d.display) end
+      options = reorder_first(options, config.source_dir_relative)
+      table.insert(options, "Custom path...")
+      vim.ui.select(options, { prompt = "Source Directory:" }, function(choice, idx)
+        if not choice then callback(config); return end
+        if choice == "Custom path..." then
+          vim.ui.input({ prompt = "Path: ", default = config.source_dir_relative or "" }, function(val)
+            if val and val ~= "" then
+              config.source_dir_relative = val
+              config.source_dir = vim.fn.fnamemodify(val, ":p")
+            end
+            callback(config)
+          end)
+        else
+          local dir = build_dirs[idx] or build_dirs[1]
+          config.source_dir_relative = dir.relative
+          config.source_dir = dir.path
+          callback(config)
+        end
+      end)
+
+    elseif field_key == "build_action" then
+      local actions_list = reorder_first(get_build_actions(), config.build_action)
+      vim.ui.select(actions_list, { prompt = "Build Action:" }, function(choice)
+        if choice then config.build_action = choice end
+        callback(config)
+      end)
+
+    elseif field_key == "optimization" then
+      local opt_list = reorder_first(get_optimization_levels(), config.optimization)
+      vim.ui.select(opt_list, { prompt = "Optimization:" }, function(choice)
+        if choice then config.optimization = choice end
+        callback(config)
+      end)
+    end
+  end
+
+  pickers.new({}, {
+    prompt_title = "Build Config  [CR: run | e: change]",
+    finder = finders.new_table({
+      results = fields,
+      entry_maker = function(f)
+        return {
+          value = f,
+          display = string.format("%-8s  %s", f.label, f.value),
+          ordinal = f.label .. " " .. f.value,
+        }
+      end,
+    }),
+    sorter = conf.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr, map)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        on_run(config)
+      end)
+
+      map("n", "e", function()
+        local sel = action_state.get_selected_entry()
+        if not sel then return end
+        actions.close(prompt_bufnr)
+        edit_field(sel.value.key, function(updated)
+          show_config_editor(utils, boards, updated, on_run)
+        end)
+      end)
+
+      return true
+    end,
+  }):find()
+end
+
+local function run_new_wizard(utils, boards)
+  local versions = utils.get_ncs_versions()
+  if #versions == 0 then print("No NCS versions found"); return end
+
+  local version_names = {}
+  for _, v in ipairs(versions) do table.insert(version_names, v.version) end
+
+  vim.ui.select(version_names, { prompt = "SDK Version:" }, function(sdk_choice, idx)
+    if not sdk_choice or not idx then return end
+    local selected_version = versions[idx]
+    local config = { sdk_version = sdk_choice, sdk_path = selected_version.path }
+
+    print("Scanning boards in " .. selected_version.version .. "...")
+    local board_list = boards.get_all_board_variants(selected_version.path)
+    if #board_list == 0 then print("No boards found"); return end
+    table.insert(board_list, "custom")
+
+    local function ask_source()
+      local build_dirs = scan_build_directories(vim.fn.getcwd(), 3)
+      local options = {}
+      for _, d in ipairs(build_dirs) do table.insert(options, d.display) end
+      table.insert(options, "Custom path...")
+      vim.ui.select(options, { prompt = "Source Directory:" }, function(choice, sidx)
+        if not choice then return end
+        if choice == "Custom path..." then
+          vim.ui.input({ prompt = "Path: " }, function(val)
+            if val and val ~= "" then
+              config.source_dir_relative = val
+              config.source_dir = vim.fn.fnamemodify(val, ":p")
+            else
+              config.source_dir_relative = "."
+            end
+            ask_action()
+          end)
+        else
+          local dir = build_dirs[sidx] or build_dirs[1]
+          config.source_dir_relative = dir and dir.relative or "."
+          config.source_dir = dir and dir.path or nil
+          ask_action()
         end
       end)
     end
 
-    vim.ui.select(board_list, {
-      prompt = "Board Target (" .. (#board_list - 1) .. " boards):",
-    }, function(board_choice)
-      if not board_choice then
-        return
-      end
+    function ask_action()
+      vim.ui.select(get_build_actions(), { prompt = "Build Action:" }, function(choice)
+        if not choice then return end
+        config.build_action = choice
+        ask_optimization()
+      end)
+    end
 
+    function ask_optimization()
+      vim.ui.select(get_optimization_levels(), { prompt = "Optimization:" }, function(choice)
+        if not choice then return end
+        config.optimization = choice
+        execute_build(config, utils)
+      end)
+    end
+
+    local function continue_with_board(board_choice)
+      local variants = boards.get_board_variants(board_choice, selected_version.path)
+      if #variants > 0 then
+        table.insert(variants, "Use base name: " .. board_choice)
+        vim.ui.select(variants, { prompt = "Board Variant:" }, function(variant_choice)
+          if not variant_choice then return end
+          if variant_choice:match("^Use base name:") then
+            config.board = board_choice
+          else
+            config.board = variant_choice
+          end
+          ask_source()
+        end)
+      else
+        config.board = board_choice
+        ask_source()
+      end
+    end
+
+    vim.ui.select(board_list, { prompt = "Board Target (" .. (#board_list - 1) .. " boards):" }, function(board_choice)
+      if not board_choice then return end
       if board_choice == "custom" then
-        vim.ui.input({
-          prompt = "Custom board name: ",
-        }, function(custom_board)
-          if custom_board and custom_board ~= "" then
-            config.board = custom_board
-            continue_config()
+        vim.ui.input({ prompt = "Custom board name: " }, function(val)
+          if val and val ~= "" then
+            continue_with_board(val)
           end
         end)
       else
-        local variants = boards.get_board_variants(board_choice, selected_version.path)
-
-        if #variants > 0 then
-          table.insert(variants, "Use base name: " .. board_choice)
-          vim.ui.select(variants, {
-            prompt = "Board Variant:",
-          }, function(variant_choice)
-            if not variant_choice then
-              return
-            end
-
-            if variant_choice:match("^Use base name:") then
-              config.board = board_choice
-            else
-              config.board = variant_choice
-            end
-            continue_config()
-          end)
-        else
-          config.board = board_choice
-          continue_config()
-        end
+        continue_with_board(board_choice)
       end
     end)
   end)
@@ -234,28 +318,51 @@ function M.configuration()
 
   local recent = utils.load_recent_builds()
   if #recent == 0 then
-    run_wizard(utils, boards)
+    run_new_wizard(utils, boards)
     return
   end
 
-  local options = {}
-  for _, b in ipairs(recent) do
-    table.insert(options, b.label)
-  end
-  table.insert(options, "New configuration...")
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
 
-  vim.ui.select(options, {
-    prompt = "Build:",
-  }, function(choice, idx)
-    if not choice then
-      return
-    end
-    if choice == "New configuration..." then
-      run_wizard(utils, boards)
-    else
-      execute_build(recent[idx], utils)
-    end
-  end)
+  local items = {}
+  for _, b in ipairs(recent) do table.insert(items, b) end
+  table.insert(items, { label = "New configuration...", _new = true })
+
+  pickers.new({}, {
+    prompt_title = "Build  [CR: run | e: edit]",
+    finder = finders.new_table({
+      results = items,
+      entry_maker = function(item)
+        return { value = item, display = item.label, ordinal = item.label }
+      end,
+    }),
+    sorter = conf.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr, map)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local sel = action_state.get_selected_entry()
+        if not sel then return end
+        if sel.value._new then
+          run_new_wizard(utils, boards)
+        else
+          execute_build(sel.value, utils)
+        end
+      end)
+
+      map("n", "e", function()
+        local sel = action_state.get_selected_entry()
+        if not sel or sel.value._new then return end
+        actions.close(prompt_bufnr)
+        show_config_editor(utils, boards, sel.value, function(c) execute_build(c, utils) end)
+      end)
+
+      return true
+    end,
+  }):find()
 end
 
 return M

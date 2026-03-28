@@ -1,7 +1,7 @@
 -- nvim/lua/zib/plugins/telescope.lua
 return {
   "nvim-telescope/telescope.nvim",
-  tag = "0.1.8",
+  branch = "master",
   dependencies = {
     "nvim-lua/plenary.nvim",
     { "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
@@ -9,6 +9,24 @@ return {
     "folke/todo-comments.nvim",
   },
   config = function()
+    -- Shim removed nvim-treesitter APIs that telescope still depends on
+    local ok_parsers, ts_parsers = pcall(require, "nvim-treesitter.parsers")
+    if ok_parsers and not ts_parsers.ft_to_lang then
+      ts_parsers.ft_to_lang = function(ft)
+        return vim.treesitter.language.get_lang(ft) or ft
+      end
+    end
+    local ok_configs, ts_configs = pcall(require, "nvim-treesitter.configs")
+    if ok_configs and not ts_configs.is_enabled then
+      ts_configs.is_enabled = function(mod, lang, bufnr)
+        if mod == "highlight" then
+          local ok = pcall(vim.treesitter.get_parser, bufnr, lang)
+          return ok
+        end
+        return false
+      end
+    end
+
     local telescope = require("telescope")
     local actions = require("telescope.actions")
     local transform_mod = require("telescope.actions.mt").transform_mod

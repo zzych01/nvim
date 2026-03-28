@@ -21,6 +21,12 @@ keymap.set("n", "<leader>s<", "<C-w><", { desc = "Decrease window width" }) -- d
 keymap.set("n", "<leader>s+", "<C-w>+", { desc = "Increase window height" }) -- increase window height
 keymap.set("n", "<leader>s-", "<C-w>-", { desc = "Decrease window height" }) -- decrease window height
 
+keymap.set("n", "<leader>cp", function()
+  local path = vim.fn.expand("%:p")
+  vim.fn.setreg("+", path)
+  vim.notify(path)
+end, { desc = "Copy file path to clipboard" })
+
 keymap.set("n", "<leader>to", "<cmd>tabnew<CR>", { desc = "Open new tab" }) -- open new tab
 keymap.set("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" }) -- close current tab
 keymap.set("n", "<leader>tn", "<cmd>tabn<CR>", { desc = "Go to next tab" }) --  go to next tab
