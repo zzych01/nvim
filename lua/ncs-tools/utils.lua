@@ -221,6 +221,90 @@ function M.link_compile_commands()
   end
 end
 
+function M.find_gdb_path()
+  local candidates = vim.fn.glob(vim.env.HOME .. "/zephyr-sdk-*/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb", false, true)
+  if #candidates > 0 then
+    return candidates[1]
+  end
+  local opt_candidates = vim.fn.glob("/opt/zephyr-sdk-*/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb", false, true)
+  if #opt_candidates > 0 then
+    return opt_candidates[1]
+  end
+  return nil
+end
+
+-- Parse runners.yaml from a build dir to extract jlink device name and gdb path
+-- Returns { device, gdb } or nil
+function M.get_jlink_config(build_dir)
+  -- runners.yaml lives under <build_dir>/<app>/zephyr/ (sysbuild) or <build_dir>/zephyr/
+  local candidates = vim.fn.glob(build_dir .. "/**/runners.yaml", false, true)
+  -- prefer non-_sysbuild path
+  local yaml_path
+  for _, p in ipairs(candidates) do
+    if not p:find("_sysbuild") then
+      yaml_path = p
+      break
+    end
+  end
+  if not yaml_path then return nil end
+
+  local lines = vim.fn.readfile(yaml_path)
+  local result = {}
+  for _, line in ipairs(lines) do
+    local device = line:match("%-%-device=(%S+)")
+    if device then result.device = device end
+    local gdb = line:match("^%s*gdb:%s*(.+)$")
+    if gdb then result.gdb = vim.trim(gdb) end
+  end
+
+  if result.device and result.gdb then
+    return result
+  end
+  return nil
+end
+
+function M.get_build_dir_from_config(config)
+  local cwd = vim.fn.getcwd()
+  if config.source_dir_relative and config.source_dir_relative ~= "." then
+    return cwd .. "/" .. config.source_dir_relative .. "/build"
+  end
+  return cwd .. "/build"
+end
+
+function M.find_elf(build_dir)
+  local all = vim.fn.glob(build_dir .. "/**/zephyr.elf", false, true)
+  -- prefer non-_sysbuild paths (sysbuild puts a duplicate under _sysbuild/)
+  for _, p in ipairs(all) do
+    if not p:find("_sysbuild") then
+      return p
+    end
+  end
+  return all[1]
+end
+
+function M.start_debug_server()
+  local recent = M.load_recent_builds()
+  if #recent == 0 then
+    print("No recent builds — run a build first (<leader>nb)")
+    return
+  end
+  local config = recent[1]
+  local build_dir = M.get_build_dir_from_config(config)
+  local jlink_cfg = M.get_jlink_config(build_dir)
+  if not jlink_cfg then
+    vim.notify("nRF: could not read runners.yaml from " .. build_dir, vim.log.levels.ERROR)
+    return
+  end
+  local srv_cmd = string.format(
+    "JLinkGDBServerCLExe -select USB -device %s -if SWD -speed 4000 -port 2331 -nogui",
+    jlink_cfg.device
+  )
+  vim.fn.system("pkill -f JLinkGDBServer")
+  vim.notify("Starting J-Link GDB server for " .. jlink_cfg.device .. " on :2331", vim.log.levels.INFO)
+  local escaped_srv = srv_cmd:gsub("'", "'\\''")
+  vim.cmd("TermExec cmd='" .. escaped_srv .. "' id=2")
+end
+
 function M.show_project_info()
   local cwd = vim.fn.getcwd()
   local ncs_match = nil

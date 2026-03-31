@@ -102,6 +102,44 @@ return {
       virt_text_win_col = nil,
     })
 
+    -- cppdbg adapter for remote debugging (J-Link)
+    dap.adapters.cppdbg = {
+      id = "cppdbg",
+      type = "executable",
+      command = vim.fn.stdpath("data") .. "/mason/bin/OpenDebugAD7",
+    }
+
+    local function make_nrf_config()
+      local ncs_utils = require("ncs-tools.utils")
+      return {
+        name = "nRF: Attach (J-Link :2331)",
+        type = "cppdbg",
+        request = "launch",
+        program = function()
+          local recent = ncs_utils.load_recent_builds()
+          local default = ""
+          if #recent > 0 then
+            local elf = ncs_utils.find_elf(ncs_utils.get_build_dir_from_config(recent[1]))
+            default = elf or ""
+          end
+          return vim.fn.input("ELF: ", default, "file")
+        end,
+        MIMode = "gdb",
+        miDebuggerPath = ncs_utils.find_gdb_path(),
+        miDebuggerServerAddress = "localhost:2331",
+        serverLaunchTimeout = 10000,
+        stopAtEntry = false,
+        cwd = "${workspaceFolder}",
+        postRemoteConnectCommands = {
+          { text = "monitor reset", ignoreFailures = true },
+          { text = "load", ignoreFailures = true },
+        },
+      }
+    end
+
+    dap.configurations.c = { make_nrf_config() }
+    dap.configurations.cpp = { make_nrf_config() }
+
     -- Python configuration
     dap.adapters.python = {
       type = "executable",
@@ -225,6 +263,12 @@ return {
     -- Auto open/close UI
     dap.listeners.after.event_initialized["dapui_config"] = function()
       dapui.open()
+    end
+    dap.listeners.after.event_terminated["dapui_config"] = function(_, body)
+      vim.notify("DAP session terminated: " .. vim.inspect(body), vim.log.levels.WARN)
+    end
+    dap.listeners.after.disconnect["dapui_config"] = function(_, body)
+      vim.notify("DAP disconnected: " .. vim.inspect(body), vim.log.levels.WARN)
     end
     -- dap.listeners.before.event_terminated["dapui_config"] = function()
     --   dapui.close()

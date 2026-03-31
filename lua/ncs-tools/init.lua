@@ -29,6 +29,7 @@ function M.setup(opts)
   end, { desc = "NCS Menuconfig" })
   keymap.set("n", "<leader>ni", utils.show_project_info, { desc = "Show NCS project info" })
   keymap.set("n", "<leader>nl", utils.link_compile_commands, { desc = "NCS Link compile_commands.json" })
+  keymap.set("n", "<leader>nD", utils.start_debug_server, { desc = "NCS Start Debug Server (J-Link :2331)" })
 end
 
 return M
