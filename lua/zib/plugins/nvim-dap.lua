@@ -270,12 +270,12 @@ return {
     dap.listeners.after.disconnect["dapui_config"] = function(_, body)
       vim.notify("DAP disconnected: " .. vim.inspect(body), vim.log.levels.WARN)
     end
-    -- dap.listeners.before.event_terminated["dapui_config"] = function()
-    --   dapui.close()
-    -- end
-    -- dap.listeners.before.event_exited["dapui_config"] = function()
-    --   dapui.close()
-    -- end
+    dap.listeners.before.event_terminated["dapui_config"] = function()
+      dapui.close()
+    end
+    dap.listeners.before.event_exited["dapui_config"] = function()
+      dapui.close()
+    end
 
     -- Keymaps (VS Code style)
     local keymap = vim.keymap
